@@ -36,7 +36,7 @@ class PrettierRubyCommand(sublime_plugin.TextCommand):
         source_text = view.substr(region)
 
         prettified_text = self.format_code(source_text)
-        # view.replace(edit, region, prettified_text)
+        view.replace(edit, region, prettified_text)
 
     def format_code(self, source_text):
         source_file_path = self.view.file_name()
@@ -49,7 +49,7 @@ class PrettierRubyCommand(sublime_plugin.TextCommand):
         )
         cmd = [
             rbprettier_cli_path,
-            "--stdin-filepath {file_path}".format(file_path=source_file_path),
+            source_file_path,
         ]
 
         node_cmd = "node.exe" if is_windows() else "node"
@@ -76,7 +76,6 @@ class PrettierRubyCommand(sublime_plugin.TextCommand):
                     print(format_error_message(stderr_output, str(proc.returncode)))
                     return source_text
 
-            print("stdout", decode_bytes(stdout))
             return normalize_line_endings(decode_bytes(stdout))
         except OSError as ex:
             sublime.error_message(
