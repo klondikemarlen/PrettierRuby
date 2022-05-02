@@ -65,13 +65,22 @@ def env_path_exists(path):
     return False
 
 
-def get_proc_env():
+def upsert_path(path, new_entry):
+    if not env_path_contains(new_entry, path) and env_path_exists(new_entry):
+        return ":".join([new_entry, path])
+    return path
+
+
+def get_proc_env(additional_paths=None):
+    additional_paths = [] if additional_paths is None else additional_paths
+
     env = None
     if not is_windows():
         env = os.environ.copy()
-        usr_path = ":/usr/local/bin"
-        if not env_path_contains(usr_path) and env_path_exists(usr_path):
-            env["PATH"] += usr_path
+        env["PATH"] = upsert_path(env["PATH"], "/usr/local/bin")
+        for path in reversed(additional_paths):
+            env["PATH"] = upsert_path(env["PATH"], path)
+
     return env
 
 
@@ -103,17 +112,16 @@ def is_str_none_or_empty(val):
     return False
 
 
-def which(command, source_file=None):
+def which(command, working_directory=None):
     path = os.defpath
-    if source_file:
-        search_paths = source_file.split(os.pathsep)
-        path = ":".join(search_paths)
+    if working_directory:
+        path = ":".join([working_directory, path])
 
-    return shutil.which(command, path)
+    return shutil.which(command, path=path)
 
 
-def resolve_path(command, source_file, default=None):
-    command_path = which(command, source_file)
+def resolve_path(command, working_directory, default=None):
+    command_path = which(command, working_directory)
     if command_path:
         return command_path
 

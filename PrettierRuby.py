@@ -1,8 +1,21 @@
-import os
 from subprocess import Popen, PIPE
+import imp
+import os
+import sys
+import inspect
 
 import sublime
 import sublime_plugin
+
+# Reload sub-packages
+package_name = "PrettierRuby"
+print(
+    "Performing custom full reload of {package_name}".format(package_name=package_name)
+)
+for module in sys.modules:
+    if module.startswith(package_name) and module != package_name:
+        imp.reload(sys.modules[package_name])
+# end sub-package reloading
 
 from .prettier_ruby.utils import (
     decode_bytes,
@@ -23,31 +36,36 @@ class PrettierRubyCommand(sublime_plugin.TextCommand):
         source_text = view.substr(region)
 
         prettified_text = self.format_code(source_text)
-
-        view.replace(edit, region, prettified_text)
+        # view.replace(edit, region, prettified_text)
 
     def format_code(self, source_text):
         source_file_path = self.view.file_name()
-        node_cmd = "node.exe" if is_windows() else "node"
-        node_path = resolve_path(
-            node_cmd, source_file_path, default="/home/marlen/.asdf/shims/node"
-        )
+        working_directory = os.path.dirname(source_file_path)
+
         rbprettier_cli_path = resolve_path(
             "rbprettier",
-            source_file_path,
+            working_directory,
             default="/home/marlen/.asdf/shims/rbprettier",
         )
         cmd = [
-            node_path,
             rbprettier_cli_path,
+            "--stdin-filepath {file_path}".format(file_path=source_file_path),
         ]
+
+        node_cmd = "node.exe" if is_windows() else "node"
+        node_binary_path = resolve_path(
+            node_cmd, working_directory, default="/home/marlen/.asdf/shims/node"
+        )
+        node_path = os.path.dirname(node_binary_path)
+        env = get_proc_env(additional_paths=[working_directory, node_path])
+
         try:
             proc = Popen(
                 cmd,
                 stdin=PIPE,
                 stderr=PIPE,
                 stdout=PIPE,
-                env=get_proc_env(),
+                env=env,
                 shell=is_windows(),
             )
             stdout, stderr = proc.communicate(input=source_text.encode("utf-8"))
@@ -56,7 +74,9 @@ class PrettierRubyCommand(sublime_plugin.TextCommand):
                 stderr_output = normalize_line_endings(decode_bytes(stderr))
                 if stderr_output:
                     print(format_error_message(stderr_output, str(proc.returncode)))
+                    return source_text
 
+            print("stdout", decode_bytes(stdout))
             return normalize_line_endings(decode_bytes(stdout))
         except OSError as ex:
             sublime.error_message(
