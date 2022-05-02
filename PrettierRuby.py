@@ -2,7 +2,6 @@ from subprocess import Popen, PIPE
 import imp
 import os
 import sys
-import inspect
 
 import sublime
 import sublime_plugin
@@ -66,6 +65,7 @@ class PrettierRubyCommand(sublime_plugin.TextCommand):
                 stderr=PIPE,
                 stdout=PIPE,
                 env=env,
+                cwd=working_directory,
                 shell=is_windows(),
             )
             stdout, stderr = proc.communicate(input=source_text.encode("utf-8"))
